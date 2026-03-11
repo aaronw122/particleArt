@@ -24,11 +24,10 @@ from openai import OpenAI
 
 # --- Aesthetic constraints (baked into every prompt) ---
 STYLE = (
-    "Black ink flecks on white paper. Extremely sparse — only 50 to 100 small dots "
-    "suggesting the form. Mostly white space. No solid fills, no gray tones, no "
-    "gradients, no shading. Do NOT draw realistic figures. Do NOT add background "
-    "elements. Minimalist particle art, abstract, not realistic. "
-    "No face details, no clothing details."
+    "Sparse black particle flecks on a pure white background. "
+    "Minimal, lots of negative space. No gray tones, no shading — "
+    "just scattered black dots/flecks suggesting the form. "
+    "Abstract, not realistic."
 )
 
 # --- Scene descriptions ---
@@ -88,7 +87,11 @@ SCENES = {
 
 def generate_image(client: OpenAI, scene: str, output_path: Path) -> bool:
     """Generate one image and save it. Returns True on success."""
-    prompt = f"{scene}. {STYLE}"
+    prompt = (
+        f"Sparse black particle flecks on a pure white background forming [{scene}]. "
+        "Minimal, lots of negative space. No gray tones, no shading — "
+        "just scattered black dots/flecks suggesting the form. Abstract, not realistic."
+    )
 
     try:
         result = client.images.generate(
