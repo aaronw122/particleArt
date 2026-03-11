@@ -17,6 +17,7 @@ Requires OPENAI_API_KEY environment variable.
 import argparse
 import base64
 import json
+import time
 from pathlib import Path
 
 from openai import OpenAI
@@ -24,9 +25,9 @@ from openai import OpenAI
 # --- Aesthetic constraints (baked into every prompt) ---
 STYLE = (
     "Sparse black particle flecks on a pure white background. "
-    "Minimal, lots of negative space. No gray tones, no gradients, no shading — "
-    "just scattered black dots and flecks suggesting the form. "
-    "Abstract, not realistic. No face details, no clothing details."
+    "Minimal, lots of negative space. No gray tones, no shading — "
+    "just scattered black dots/flecks suggesting the form. "
+    "Abstract, not realistic."
 )
 
 # --- Scene descriptions ---
@@ -86,7 +87,11 @@ SCENES = {
 
 def generate_image(client: OpenAI, scene: str, output_path: Path) -> bool:
     """Generate one image and save it. Returns True on success."""
-    prompt = f"{scene}. {STYLE}"
+    prompt = (
+        f"Sparse black particle flecks on a pure white background forming [{scene}]. "
+        "Minimal, lots of negative space. No gray tones, no shading — "
+        "just scattered black dots/flecks suggesting the form. Abstract, not realistic."
+    )
 
     try:
         result = client.images.generate(
@@ -156,6 +161,11 @@ def main():
             # Skip if already exists (resume-friendly)
             if filepath.exists():
                 print(f"  [{count}] SKIP (exists): {filename}")
+                manifest.append({
+                    "file": filename,
+                    "category": category,
+                    "scene": scene,
+                })
                 continue
 
             print(f"  [{count}] Generating: {scene[:60]}...")
@@ -171,6 +181,9 @@ def main():
             else:
                 errors += 1
 
+            # Rate limit: pause between API calls
+            time.sleep(2)
+
     # Save manifest (useful for captioning later)
     manifest_path = output_dir / "manifest.json"
     # Merge with existing manifest if present
@@ -184,7 +197,7 @@ def main():
 
     manifest_path.write_text(json.dumps(manifest, indent=2))
 
-    print(f"\nDone! {count - errors} images saved to {output_dir}/")
+    print(f"\nDone! {len(manifest)} total images in {output_dir}/ ({errors} errors)")
     print(f"Manifest: {manifest_path}")
     if errors:
         print(f"Errors: {errors} (re-run to retry — existing images are skipped)")
