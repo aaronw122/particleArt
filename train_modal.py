@@ -1,0 +1,136 @@
+"""
+Train SDXL LoRA on Modal with A10G GPU (24GB VRAM).
+
+Setup (one-time):
+    uv run modal setup
+
+Run training:
+    uv run modal run train_modal.py
+
+Download results:
+    modal volume get lora-output /results/ ./lora_output/
+"""
+
+import modal
+
+app = modal.App("sdxl-lora-training")
+
+# Persistent volume for training output
+output_vol = modal.Volume.from_name("lora-output", create_if_missing=True)
+
+# Container image with all dependencies
+training_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .apt_install("wget")
+    .pip_install([
+        "torch",
+        "torchvision",
+        "diffusers==0.31.0",
+        "transformers==4.44.2",
+        "accelerate",
+        "bitsandbytes",
+        "safetensors",
+        "peft",
+        "xformers",
+        "datasets",
+        "Pillow",
+    ])
+    # Bake training data into the image
+    .add_local_dir("images/curated", "/root/training_data", copy=True)
+)
+
+TRIGGER = "prtkl"
+
+
+def build_dataset():
+    """Build HuggingFace ImageFolder dataset with metadata.csv."""
+    import csv
+    import os
+    import shutil
+
+    src_dir = "/root/training_data"
+    dataset_dir = "/root/dataset/train"
+    os.makedirs(dataset_dir, exist_ok=True)
+
+    rows = []
+    for img_file in sorted(os.listdir(src_dir)):
+        if not img_file.endswith(".png"):
+            continue
+        txt_file = img_file.replace(".png", ".txt")
+        txt_path = os.path.join(src_dir, txt_file)
+        if os.path.exists(txt_path):
+            with open(txt_path, "r") as f:
+                caption = f.read().strip()
+        else:
+            caption = ""
+        if not caption.startswith(TRIGGER):
+            caption = f"{TRIGGER}, {caption}"
+        shutil.copy2(os.path.join(src_dir, img_file), os.path.join(dataset_dir, img_file))
+        rows.append((img_file, caption))
+
+    with open(os.path.join(dataset_dir, "metadata.csv"), "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["file_name", "text"])
+        for fname, caption in rows:
+            writer.writerow([fname, caption])
+
+    print(f"Dataset ready: {len(rows)} images with captions")
+    for fname, caption in rows[:3]:
+        print(f"  {fname}: {caption}")
+    return len(rows)
+
+
+@app.function(
+    gpu="A10G",
+    image=training_image,
+    volumes={"/output": output_vol},
+    timeout=7200,
+)
+def train():
+    import subprocess
+
+    # Build dataset
+    num_images = build_dataset()
+    print(f"\n=== Training on {num_images} images ===\n")
+
+    # Download training script
+    subprocess.run([
+        "wget", "-q",
+        "https://raw.githubusercontent.com/huggingface/diffusers/v0.31.0/examples/advanced_diffusion_training/train_dreambooth_lora_sdxl_advanced.py",
+        "-O", "/root/train_dreambooth_lora_sdxl_advanced.py",
+    ], check=True)
+
+    # Train
+    subprocess.run([
+        "accelerate", "launch", "/root/train_dreambooth_lora_sdxl_advanced.py",
+        "--pretrained_model_name_or_path=stabilityai/stable-diffusion-xl-base-1.0",
+        "--pretrained_vae_model_name_or_path=madebyollin/sdxl-vae-fp16-fix",
+        "--instance_prompt=prtkl",
+        "--dataset_name=/root/dataset",
+        "--caption_column=text",
+        "--resolution=1024",
+        "--train_batch_size=1",
+        "--gradient_accumulation_steps=8",
+        "--gradient_checkpointing",
+        "--mixed_precision=fp16",
+        "--use_8bit_adam",
+        "--learning_rate=1e-5",
+        "--lr_scheduler=cosine",
+        "--lr_warmup_steps=30",
+        "--max_train_steps=300",
+        "--rank=16",
+        "--output_dir=/output/results",
+        "--checkpointing_steps=100",
+        "--checkpoints_total_limit=3",
+        "--enable_xformers_memory_efficient_attention",
+        "--cache_latents",
+        "--snr_gamma=5.0",
+        "--validation_prompt=prtkl, a figure standing with arms at sides",
+        "--num_validation_images=3",
+        "--validation_epochs=6",
+        "--seed=42",
+    ], check=True)
+
+    output_vol.commit()
+    print("\n=== Training complete! ===")
+    print("Download results with: modal volume get lora-output /results/ ./lora_output/")

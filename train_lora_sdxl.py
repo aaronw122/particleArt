@@ -85,7 +85,7 @@ print("\nAll checks passed!")
   --instance_prompt="prtkl" \
   --dataset_name="/content/dataset" \
   --caption_column="text" \
-  --resolution=1024 \
+  --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=8 \
   --gradient_checkpointing \
@@ -99,11 +99,7 @@ print("\nAll checks passed!")
   --output_dir="/content/lora_output" \
   --checkpointing_steps=100 \
   --checkpoints_total_limit=3 \
-  --validation_prompt="prtkl, a figure standing with arms at sides" \
-  --num_validation_images=1 \
-  --validation_epochs=6 \
   --enable_xformers_memory_efficient_attention \
-  --cache_latents \
   --snr_gamma=5.0 \
   --seed=42
 
