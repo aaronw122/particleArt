@@ -152,20 +152,19 @@ async def generate_image(
 ) -> bool:
     """Generate one image using reference image for style consistency."""
     prompt = (
-        "Sparse black particle flecks on a pure white background. "
-        f"Subject: an abstract human figure {scene}. "
-        "Only small scattered dots — no lines, no strokes, no outlines, no dense clusters. "
-        "Approximately 100-200 small dots total. Keep 70% of the canvas empty white space. "
-        "All elements — figures and objects — equally sparse and light. "
-        "No element bolder or denser than any other. "
-        "No thick lines, no solid fills, no gray tones, no shading, no background detail, no color."
+        "Match the visual style of the reference image. "
+        f"Sparse black particle flecks on a pure white background forming "
+        f"an abstract human figure {scene}. Minimal, lots of negative space. "
+        "No gray tones, no shading — just scattered black dots/flecks suggesting "
+        "the form. Abstract, not realistic."
     )
 
     async with semaphore:
         for attempt in range(3):
             try:
-                result = await client.images.generate(
+                result = await client.images.edit(
                     model="gpt-image-1",
+                    image=REFERENCE_IMAGE.open("rb"),
                     prompt=prompt,
                     size="1024x1024",
                     n=1,
@@ -190,6 +189,7 @@ async def main():
     parser.add_argument("--variations", type=int, default=2, help="Variations per scene (default: 2)")
     parser.add_argument("--output", type=str, default="images/raw", help="Output directory")
     parser.add_argument("--parallel", type=int, default=5, help="Max parallel API calls (default: 5)")
+    parser.add_argument("--skip-curated", type=str, default=None, help="Path to curated dir — skip scenes already curated")
     args = parser.parse_args()
 
     client = AsyncOpenAI()
@@ -205,11 +205,25 @@ async def main():
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Build set of curated scenes to skip
+    curated_scenes = set()
+    if args.skip_curated:
+        curated_dir = Path(args.skip_curated)
+        manifest_path_check = Path("images/raw") / "manifest.json"
+        if manifest_path_check.exists():
+            manifest_data = json.loads(manifest_path_check.read_text())
+            file_to_scene = {e["file"]: (e["category"], e["scene"]) for e in manifest_data}
+            for f in curated_dir.glob("*.png"):
+                if f.name in file_to_scene:
+                    curated_scenes.add(file_to_scene[f.name])
+        print(f"Skipping {len(curated_scenes)} already-curated scenes\n")
+
     # Flatten all scenes
     all_scenes = []
     for category, scenes in SCENES.items():
         for scene in scenes:
-            all_scenes.append((category, scene))
+            if (category, scene) not in curated_scenes:
+                all_scenes.append((category, scene))
 
     if args.test:
         test_scenes = []
