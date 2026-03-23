@@ -90,7 +90,7 @@ Starting point for styles far from photorealism. Change one parameter at a time.
 - SNR gamma: 5.0
 - Noise offset: 0.0357 (see note below — value depends on your target background)
 - LR scheduler: constant (cosine wastes the tail for styles fighting the prior)
-- Max steps: 1000-1900 (50 images needed ~1500; scale with dataset size)
+- Max steps: 1000-1900 (50 images needed ~1900; scale with dataset size)
 - Checkpointing: every 100 steps, keep last 5-10
 
 **Calibrate aggressiveness to style distance.** For styles far from photorealism
@@ -124,29 +124,29 @@ accelerate launch train_dreambooth_lora_sdxl_advanced.py \
   --gradient_accumulation_steps=4 \
   --gradient_checkpointing \
   --mixed_precision=bf16 \
-  --optimizer=prodigy \
-  --learning_rate=1.0 \
-  --text_encoder_lr=1.0 \
-  --prodigy_safeguard_warmup=True \
-  --prodigy_use_bias_correction=True \
+  --use_8bit_adam \
+  --learning_rate=9e-5 \
+  --text_encoder_lr=2.5e-4 \
   --train_text_encoder_ti \
   --train_text_encoder_ti_frac=0.5 \
   --token_abstraction=TOK \
   --num_new_tokens_per_abstraction=2 \
   --lr_scheduler=constant \
-  --lr_warmup_steps=0 \
-  --max_train_steps=1500 \
+  --lr_warmup_steps=100 \
+  --max_train_steps=1900 \
   --rank=32 \
   --snr_gamma=5.0 \
   --noise_offset=0.0357 \
   --output_dir=./output \
   --checkpointing_steps=100 \
-  --checkpoints_total_limit=10 \
+  --checkpoints_total_limit=25 \
   --enable_xformers_memory_efficient_attention \
-  --validation_prompt="TOK, a figure standing" \
+  --validation_prompt="TOK, a figure standing with arms at sides" \
   --num_validation_images=1 \
   --validation_epochs=6 \
-  --seed=42
+  --seed=42 \
+  --logging_dir=./logs \
+  --report_to=tensorboard
 ```
 
 ## Checkpoint Sweep
