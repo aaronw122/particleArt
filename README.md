@@ -2,6 +2,10 @@
 
 Type a word, get a particle art figure. Abstract anthropomorphic forms made of sparse black dots on white backgrounds.
 
+<p align="center">
+  <img src="assets/example.png" alt="Particle art example" width="512">
+</p>
+
 ## What This Is
 
 A fine-tuned SDXL LoRA that generates particle art — human figures composed of scattered black flecks suggesting form through negative space. Not pointillism, not stippling — something more abstract and minimal.
