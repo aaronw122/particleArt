@@ -37,11 +37,22 @@ A small local LLM translates the user's input phrase into a concrete visual desc
 
 **Why local?** The translation task is trivial — one sentence in, one sentence out. No need to pay per-call for a cloud API. Latency is ~1-2 seconds on CPU, which is negligible compared to the diffusion step.
 
+**Constraints (discovered during model evaluation):**
+- Single figures only (no two-figure compositions — training data was ~40+ single figures, only ~6-7 two-figure)
+- Whole-body poses and gestures (no fine hand/finger details)
+- No small handheld objects (express through body posture, not held items)
+- Prompts must use `<s0><s1>` trigger tokens
+- Steer toward: balancing, crawling, meditation, arms raised, leaping, lunging, arching
+
 ### Stage 2: Visual Description → Static Particle Image (Diffusion)
 
 Fine-tuned diffusion model takes the visual description from Stage 1 and generates the "target frame" — the final composition the particles settle into.
 
 The LoRA training captions are purely visual ("figure waving one hand," "two figures embracing") — the model learns the particle art **style**, not semantic interpretation. Semantic interpretation is Stage 1's job.
+
+**Deployment:** Modal serverless endpoint (`youfoundaaron--prtkl-generate-model-generate.modal.run`).
+**Weights:** HuggingFace (`aaronw122/prtkl-sdxl-lora`), checkpoint-1800 AdamW v4.
+**Post-process:** Threshold to transparent PNG (dissolve background issues).
 
 ### Stage 3: Static Image → Animation (Programmatic)
 
@@ -55,82 +66,20 @@ Diffusion models generate single frames. Video diffusion models exist but they'r
 
 ---
 
-## Phases
+## Progress
 
-### Phase 1: Curate Training Data
+### Done
+- [x] Phase 1: Training data curation (29 images in `images/curated/`)
+- [x] Phase 2: LoRA fine-tuning (AdamW v4, step 1800 selected)
+- [x] Phase 2: Deploy inference endpoint (Modal, `youfoundaaron` account)
+- [x] Phase 2: Upload weights to HuggingFace (`aaronw122/prtkl-sdxl-lora`)
 
-**This is the hardest part.**
-
-#### Approach: OpenAI API batch generation
-
-Use the `gpt-image-1` API (same model behind ChatGPT Plus image gen) to programmatically generate and download images. This avoids manually saving images from the ChatGPT UI.
-
-**Script:** `generate_images.py` — takes a list of scene descriptions, generates images via API, downloads them to `images/raw/`. Vary scenes across compositions (embracing, reaching, dancing, sitting, etc.) to give the model enough diversity to generalize.
-
-**Cost:** ~$0.02-0.08 per image. Budget ~$4-16 for 200 images.
-
-**Workflow:**
-1. Generate 10 test images first (~$0.50) to validate the aesthetic
-2. If the style lands, batch out the remaining 150-200
-3. Cherry-pick 30-50 that match the aesthetic exactly
-4. Post-process if needed: threshold to pure black/white, remove gradients, thin out dense areas (Python + PIL)
-5. Caption each image with what it depicts ("two figures embracing", "person reaching upward", "figure curled inward")
-
-**Prompt template:**
-
-> "Sparse black particle flecks on a pure white background forming an abstract human figure [doing X]. Minimal, lots of negative space. No gray tones, no shading — just scattered black dots/flecks suggesting the form. Abstract, not realistic."
-
-**Risk:** GPT tends to over-render. Aggressive curation + post-processing script to enforce black/white threshold.
-
-### Phase 2: Fine-Tune Diffusion Model LoRA
-
-- Base model: SDXL (Colab T4) or Flux (cloud A100)
-- Same LoRA mechanics as text fine-tuning — just images instead of text
-- Train on curated dataset, ~1-2 hours
-- Test: prompt with phrases NOT in training data, see if style holds and semantic mapping works
-
-**Key settings (SDXL LoRA):**
-- 30-50 training images
-- Rank 16-32
-- ~1000-1500 training steps
-- Colab T4 (16GB VRAM) is sufficient
-
-### Phase 3: ControlNet for Pose Guidance (Maybe)
-
-- If the model struggles with coherent figures, add OpenPose conditioning
-- Provides skeleton structure → particle rendering respects human poses
-- **Test without this first** — the aesthetic is abstract enough it might not need it
-- If needed: Flux ControlNet Union Pro 2.0 or SDXL OpenPose ControlNet
-
-### Phase 4: Particle Animation Engine
-
-- p5.js canvas on the web
-- Algorithm:
-  1. Receive generated target image from backend
-  2. Sample black pixel positions → these become particle target coordinates
-  3. Initialize particles at random positions
-  4. Animate: particles ease from random positions into target positions
-- Tunable parameters: speed, easing curve, particle size, scatter radius, particle count
-- Could add subtle drift/breathing after formation for a living feel
-
-### Phase 5: Web App
-
-- **Frontend:** Text input field + p5.js canvas
-- **Backend:** API endpoint that takes text, runs diffusion model, returns target image
-- **Hosting:** GPU endpoint for inference (Replicate, Modal, or RunPod serverless)
-- **Flow:** User types phrase → loading state → local LLM translates phrase to visual description → backend generates target frame from description → frontend animates particles into it
-
----
-
-## Open Risks
-
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| Training data curation is slow | High | Use GPT-4o to bootstrap, post-process programmatically |
-| GPT over-renders (too detailed) | Medium | Aggressive cherry-picking + black/white thresholding script |
-| LLM produces descriptions outside diffusion model's trained vocabulary | Medium | Constrain LLM system prompt to 1-2 figures, posture/gesture only; expand training data over time |
-| Inference latency (5-30s per generation) | Medium | Loading animation while generating; consider caching common phrases |
-| ControlNet needed but adds complexity | Low | Test without first; abstract aesthetic is forgiving |
+### Remaining
+- [ ] Post-processing pipeline (threshold to transparent PNG)
+- [ ] Stage 1: LLM translator layer (Ollama on Dell OptiPlex or cloud fallback)
+- [ ] Stage 3: Particle animation engine (p5.js)
+- [ ] Web app frontend (text input + canvas)
+- [ ] Integration: wire all three stages together
 
 ---
 
@@ -141,11 +90,10 @@ Use the `gpt-image-1` API (same model behind ChatGPT Plus image gen) to programm
 | Phrase → visual description | Phi-3.5-mini or Qwen2.5-3B via Ollama (local, CPU) |
 | Training data generation | OpenAI API (`gpt-image-1`) via `generate_images.py` |
 | Post-processing | Python + PIL |
-| Base diffusion model | SDXL or Flux |
-| Fine-tuning | LoRA via Unsloth/diffusers on Colab T4 |
-| Pose conditioning (if needed) | ControlNet OpenPose |
+| Base diffusion model | SDXL 1.0 |
+| Fine-tuning | LoRA + Textual Inversion (pivotal tuning) via diffusers |
 | Animation engine | p5.js |
 | Frontend | HTML/JS + p5.js |
-| Backend / inference | Replicate, Modal, or RunPod serverless |
+| Backend / inference | Modal serverless (A10G) |
 | LLM runtime | Ollama on Linux (Dell OptiPlex i5-8500T) |
 | Export | Live canvas (optional gif export) |
