@@ -1,2 +1,18 @@
 conversations/
-images
+__pycache__/
+.DS_Store
+*.log
+
+# Model weights and training outputs
+final_weights/
+lora_output/
+lora_output_*/
+generated/
+comparison/
+
+# Training images
+images/
+
+# Python
+.venv/
+*.pyc
