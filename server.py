@@ -18,48 +18,35 @@ from pydantic import BaseModel
 MODAL_ENDPOINT = "https://youfoundaaron--prtkl-generate-model-generate.modal.run"
 
 SYSTEM_PROMPT = """\
-You translate a single word or short phrase into a physical pose description for a particle art generator.
+You translate a word into a one-sentence pose description for abstract particle art.
 
-This art style renders abstract human forms from dots — no detail, no features, no clothing. Your job is to describe a single body's STATIC posture that captures the feeling of the input.
+Imagine a featureless mannequin — no face, no clothing, no gender, no objects. Describe ONLY how its body segments are positioned: head, torso, arms, hands, legs, feet.
 
-ABSOLUTE RULES — every output must follow ALL of these:
-1. Exactly ONE figure. Never mention a second person, partner, child, or "another figure"
-2. No gender. Never say man, woman, boy, girl, he, she. Always "a figure"
-3. No clothing or accessories. Never mention dress, gown, suit, hat, shoes, etc.
-4. No objects or furniture. Never mention bench, chair, bouquet, weapon, etc.
-5. No facial features or expressions. Never mention smiling, furrowed, eyes, lips, peering, gazing, expression
-6. Body posture ONLY: arms, legs, torso, head position, weight distribution
-7. Describe a FROZEN moment, not continuous motion. Not "swaying" but "mid-sway leaning left"
-8. One sentence maximum
-9. Output ONLY the description, no commentary or refusals
+Rules:
+1. Exactly ONE figure, always called "a figure"
+2. Use only concrete body-position language — no emotions, mood, style, or intent words in the output
+3. No clothing, accessories, facial features, objects, or furniture
+4. Do not imply contact with objects, furniture, or another person
+5. Avoid words an image model could misread as clothing: heels, collar, fist, sole, crown, palm, nails, laces, cuffs
+6. Describe a FROZEN moment, not ongoing motion — "mid-sway leaning left" not "swaying"
+7. Output ONLY the pose description, one sentence, no commentary
 
-CRITICAL: Make each pose as physically DISTINCTIVE as possible. Use the full range of body positions:
-- Levels: standing, sitting, kneeling, lying, crouching, balancing on one foot
-- Asymmetry: one arm up and one down, twisted torso, weight on one side
-- Extremes: fully stretched out, tightly curled, wide splits, deep lunges
-- Direction: facing up, facing down, turned sideways, arching backward
-Avoid defaulting to "standing tall with arms raised" or "slumped forward with arms hanging" — these are overused. Find the specific gesture that ONLY this word would produce.
-
-If the input is provocative or inappropriate, ignore the provocation and describe a neutral standing pose.
-
-If the input implies multiple people, express the EMOTION through one body's posture instead.
+If the input refers to sex, nudity, or explicit anatomy, output: a figure standing with arms crossed over chest.
+If the input implies multiple people, express the feeling through one body's posture.
+Match the pose intensity to the word. Neutral or casual words (okay, hello, maybe, sure) get relaxed, natural poses. Only emotional words get dramatic poses.
 
 Examples:
-- "hello" → "a figure waving one hand overhead, weight on back foot"
+- "hello" → "a figure with one arm raised overhead, weight shifted to the back foot"
+- "okay" → "a figure standing with one hand resting on the opposite arm, head tilted slightly"
 - "grief" → "a figure hunched forward, head bowed, arms wrapped around torso"
-- "freedom" → "a figure with arms spread wide, head tilted back, chest open"
-- "kiss" → "a figure leaning forward, chin slightly lifted, arms reaching out"
-- "exhaustion" → "a figure collapsed on their side, one arm draped over the ground"
-- "hope" → "a figure on tiptoes, one arm stretched straight up, body elongated"
+- "freedom" → "a figure with arms spread wide, head tilted back, torso arched slightly"
+- "kiss" → "a figure leaning forward, chin slightly lifted, arms reaching forward"
+- "exhaustion" → "a figure on one side, one arm extended along the ground, legs bent"
+- "hope" → "a figure on tiptoes, one arm stretched straight up, torso stretched upward"
 - "shame" → "a figure turned sideways, shoulders curled inward, head tucked into chest"
-- "power" → "a figure in a wide lunge, one fist thrust forward, torso twisted"
+- "power" → "a figure in a wide lunge, one arm thrust forward, torso twisted"
 - "loneliness" → "a figure sitting with knees drawn to chest, arms wrapped around legs"
-- "curiosity" → "a figure on hands and knees, weight shifted forward, head low"
-- "surrender" → "a figure on their knees, arms raised high above head, palms open"
-- "broken" → "a figure lying flat on their back, arms and legs splayed loosely"
-- "waiting" → "a figure leaning against nothing, one foot crossed over the other, arms folded"
-- "lost" → "a figure mid-step with one arm reaching out, torso twisted, head turned away"
-- "prayer" → "a figure kneeling, hands pressed together at chest height, head bowed forward"
+- "surrender" → "a figure kneeling, arms raised high above head, hands open"
 - "defeat" → "a figure collapsed forward onto hands and knees, head hanging between arms"
 """
 
@@ -107,6 +94,19 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
         " man ", " woman ", " boy ", " girl ", " he ", " she ",
         " his ", " her ", " male ", " female ",
     ]
+    # Anatomically valid words that SDXL misinterprets as clothing/objects
+    AMBIGUOUS_WORDS = [
+        "heels", "heel", "laces", "collar", "cuff", "cuffs",
+        "sole", "crown", "palm", "palms", "nails", "fist", "fists",
+        "sleeve", "strap", "train", "temple", "nape", "bare",
+    ]
+    # Emotion/intent/style words that shouldn't appear in pose descriptions
+    INTENT_WORDS = [
+        "in thought", "in prayer", "in grief", "in pain", "in joy",
+        "thoughtful", "pensive", "sorrowful", "joyful", "sensual",
+        "elegant", "aggressive", "romantic", "graceful", "anxious",
+        "contemplat", "meditating", "praying", "mourning", "celebrating",
+    ]
     REFUSAL_MARKERS = [
         "i cannot", "i can't", "i'm sorry", "i am sorry",
         "not appropriate", "is there something else",
@@ -136,6 +136,12 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
         for word in GENDER_WORDS:
             if word in lower:
                 return "gender"
+        for word in AMBIGUOUS_WORDS:
+            if word in lower:
+                return "ambiguous-visual"
+        for word in INTENT_WORDS:
+            if word in lower:
+                return "intent-language"
         return None
 
     async def call_ollama(client: httpx.AsyncClient, word: str) -> str:
