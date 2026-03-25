@@ -72,14 +72,10 @@
 
     .result {
       width: 100%;
-      aspect-ratio: 1;
       max-width: 512px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      overflow: hidden;
     }
 
     .result img {
@@ -130,7 +126,7 @@
       if (!word) return;
 
       btn.disabled = true;
-      status.textContent = 'translating...';
+      status.textContent = '';
       result.innerHTML = '<span class="placeholder">generating...</span>';
 
       try {
@@ -143,7 +139,7 @@
 
         if (!translateRes.ok) throw new Error('Translation failed');
         const { prompt } = await translateRes.json();
-        status.textContent = `generating: "${prompt}"`;
+        status.textContent = '';
 
         // Step 2: Generate image via local server (which calls Modal)
         const imageRes = await fetch(`${API_BASE}/generate`, {
