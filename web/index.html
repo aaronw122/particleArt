@@ -35,6 +35,12 @@
       text-transform: uppercase;
     }
 
+    .subtitle {
+      font-size: 0.9rem;
+      color: #999;
+      font-weight: 300;
+    }
+
     .input-row {
       display: flex;
       gap: 0.5rem;
@@ -99,6 +105,7 @@
 <body>
   <div class="container">
     <h1>prtkl</h1>
+    <p class="subtitle">type a word, see it come to life</p>
     <div class="input-row">
       <input type="text" id="word" placeholder="type a word" autofocus>
       <button id="generate" onclick="generate()">go</button>
