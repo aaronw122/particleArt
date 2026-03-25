@@ -164,15 +164,21 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
         async with httpx.AsyncClient(timeout=30) as client:
             # Try up to 3 times to get a valid description
             description = None
-            for _ in range(3):
+            for attempt in range(3):
                 description = await call_ollama(client, req.word)
-                if validate_description(description) is None:
+                violation = validate_description(description)
+                print(f"[translate] '{req.word}' attempt {attempt+1}: {description}")
+                if violation:
+                    print(f"[translate]   REJECTED ({violation})")
+                else:
                     break
             else:
                 # All attempts violated constraints — use fallback
+                print(f"[translate] '{req.word}' → FALLBACK (all attempts failed)")
                 description = "a figure standing with arms crossed over chest"
 
         prompt = f"<s0><s1>, {description}, white background"
+        print(f"[translate] '{req.word}' → final prompt: {prompt}")
         return {"prompt": prompt, "description": description}
 
     @app.post("/generate")
