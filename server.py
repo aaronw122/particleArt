@@ -131,11 +131,7 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
                 violation = validate_description(description)
 
             if violation:
-                from fastapi.responses import JSONResponse
-                return JSONResponse(
-                    status_code=422,
-                    content={"error": f"couldn't generate a valid pose for that input"},
-                )
+                description = "a figure standing with arms crossed over chest"
 
         prompt = f"<s0><s1>, {description}, white background"
         return {"prompt": prompt, "description": description}
