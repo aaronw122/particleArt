@@ -144,8 +144,9 @@
           body: JSON.stringify({ word }),
         });
 
-        if (!translateRes.ok) throw new Error('Translation failed');
-        const { prompt } = await translateRes.json();
+        const translateData = await translateRes.json();
+        if (!translateRes.ok) throw new Error(translateData.error || 'Translation failed');
+        const { prompt } = translateData;
         status.textContent = '';
 
         // Step 2: Generate image via local server (which calls Modal)

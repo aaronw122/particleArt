@@ -20,21 +20,31 @@ MODAL_ENDPOINT = "https://youfoundaaron--prtkl-generate-model-generate.modal.run
 SYSTEM_PROMPT = """\
 You translate a single word or short phrase into a physical pose description for a particle art generator.
 
-Rules:
-- Output ONLY the pose description, nothing else
-- Single figure only, no multiple people
-- Describe whole-body posture and gesture (arms, legs, torso, head position)
-- No fine hand/finger details, no small objects
-- No color, no style, no background details
-- One sentence maximum
-- Be specific and visual
+This art style renders abstract human forms from dots — no detail, no features, no clothing. Your job is to describe a single body's posture that captures the feeling of the input.
+
+ABSOLUTE RULES — every output must follow ALL of these:
+1. Exactly ONE figure. Never mention a second person, partner, child, or "another figure"
+2. No gender. Never say man, woman, boy, girl, he, she. Always "a figure"
+3. No clothing or accessories. Never mention dress, gown, suit, hat, shoes, etc.
+4. No objects or furniture. Never mention bench, chair, bouquet, weapon, etc.
+5. No facial features or expressions. Never mention smiling, eyes, lips, facial expression
+6. Body posture ONLY: arms, legs, torso, head position, weight distribution
+7. One sentence maximum
+8. Output ONLY the description, no commentary or refusals
+
+If the input is provocative or inappropriate, ignore the provocation and describe a neutral standing pose.
+
+If the input implies multiple people, express the EMOTION through one body's posture instead.
 
 Examples:
 - "hello" → "a figure waving one hand overhead, weight on back foot"
 - "grief" → "a figure hunched forward, head bowed, arms wrapped around torso"
 - "freedom" → "a figure with arms spread wide, head tilted back, chest open"
-- "balance" → "a figure standing on one leg, arms extended to the sides"
+- "kiss" → "a figure leaning forward, chin slightly lifted, arms reaching out"
+- "wedding" → "a figure standing tall, one arm extended, weight on back foot"
+- "hug" → "a figure with arms wrapped tightly around own torso, leaning forward"
 - "defeat" → "a figure on their knees, head dropped, shoulders slumped"
+- "loneliness" → "a figure sitting with knees drawn to chest, arms wrapped around legs"
 """
 
 NEGATIVE_PROMPT = (
@@ -53,6 +63,54 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Words/phrases that indicate the output violated our constraints
+    MULTI_FIGURE_WORDS = [
+        "another figure", "second figure", "smaller figure", "other figure",
+        "partner", "two figures", "both", "each other", "together",
+    ]
+    CLOTHING_WORDS = [
+        "dress", "gown", "suit", "hat", "shoes", "shirt", "pants",
+        "skirt", "jacket", "cape", "veil", "boots", "gloves",
+    ]
+    OBJECT_WORDS = [
+        "bench", "chair", "table", "bouquet", "weapon", "sword",
+        "knife", "gun", "flower", "book", "cup",
+    ]
+    REFUSAL_MARKERS = [
+        "i cannot", "i can't", "i'm sorry", "i am sorry",
+        "not appropriate", "is there something else",
+    ]
+
+    def validate_description(description: str) -> str | None:
+        """Returns an error reason if the description violates constraints, else None."""
+        lower = description.lower()
+        for word in REFUSAL_MARKERS:
+            if word in lower:
+                return "refusal"
+        for word in MULTI_FIGURE_WORDS:
+            if word in lower:
+                return "multi-figure"
+        for word in CLOTHING_WORDS:
+            if word in lower:
+                return "clothing"
+        for word in OBJECT_WORDS:
+            if word in lower:
+                return "objects"
+        return None
+
+    async def call_ollama(client: httpx.AsyncClient, word: str) -> str:
+        resp = await client.post(
+            f"{ollama_url}/api/generate",
+            json={
+                "model": ollama_model,
+                "prompt": word,
+                "system": SYSTEM_PROMPT,
+                "stream": False,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["response"].strip().strip('"')
+
     class TranslateRequest(BaseModel):
         word: str
 
@@ -62,19 +120,22 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
 
     @app.post("/translate")
     async def translate(req: TranslateRequest):
-        """Translate a word into a pose description via Ollama."""
+        """Translate a word into a pose description via Ollama, with validation."""
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                f"{ollama_url}/api/generate",
-                json={
-                    "model": ollama_model,
-                    "prompt": req.word,
-                    "system": SYSTEM_PROMPT,
-                    "stream": False,
-                },
-            )
-            resp.raise_for_status()
-            description = resp.json()["response"].strip().strip('"')
+            description = await call_ollama(client, req.word)
+            violation = validate_description(description)
+
+            # Retry once if the output violated constraints
+            if violation:
+                description = await call_ollama(client, req.word)
+                violation = validate_description(description)
+
+            if violation:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=422,
+                    content={"error": f"couldn't generate a valid pose for that input"},
+                )
 
         prompt = f"<s0><s1>, {description}, white background"
         return {"prompt": prompt, "description": description}
