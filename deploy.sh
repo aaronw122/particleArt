@@ -37,7 +37,7 @@ for i in $(seq 1 30); do
 done
 
 echo "--- Pulling Ollama model (if not cached)..."
-ssh "${REMOTE_HOST}" "docker exec ${PROJECT_NAME}-ollama-1 ollama pull llama3.1:8b"
+ssh "${REMOTE_HOST}" "docker exec ${PROJECT_NAME}-ollama-1 ollama pull llama3.2:3b"
 
 echo "--- Verifying containers..."
 ssh "${REMOTE_HOST}" "docker ps --filter name=${PROJECT_NAME} --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
