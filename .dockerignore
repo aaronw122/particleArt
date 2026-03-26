@@ -1,0 +1,30 @@
+.git
+.gitignore
+__pycache__
+.env
+.env.*
+*.md
+.vscode
+.DS_Store
+Dockerfile
+docker-compose.yml
+deploy.sh
+terraform
+
+# Training artifacts — not needed for serving
+images/
+final_weights/
+lora_output*/
+generated/
+comparison/
+conversations/
+inference/
+*.log
+*.zip
+*.py
+!server.py
+
+# Python dev
+.venv/
+*.pyc
+.pytest_cache

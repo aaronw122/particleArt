@@ -157,6 +157,10 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
         resp.raise_for_status()
         return resp.json()["response"].strip().strip('"')
 
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+
     class TranslateRequest(BaseModel):
         word: str
 

@@ -13,6 +13,14 @@ comparison/
 # Training images
 images/
 
+# Environment
+.env*
+!.env.example
+
+# Terraform
+*.tfstate*
+.terraform/
+
 # Python
 .venv/
 *.pyc
