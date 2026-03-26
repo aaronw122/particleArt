@@ -76,10 +76,10 @@ Diffusion models generate single frames. Video diffusion models exist but they'r
 
 ### Remaining
 - [ ] Post-processing pipeline (threshold to transparent PNG)
-- [ ] Stage 1: LLM translator layer (Ollama on Dell OptiPlex or cloud fallback)
+- [x] Stage 1: LLM translator layer (Ollama on Dell OptiPlex or cloud fallback)
 - [ ] Stage 3: Particle animation engine (p5.js)
-- [ ] Web app frontend (text input + canvas)
-- [ ] Integration: wire all three stages together
+- [x] Web app frontend (text input + canvas)
+- [x] Integration: wire all three stages together
 
 ---
 

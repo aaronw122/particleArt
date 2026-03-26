@@ -152,10 +152,15 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
                 "prompt": word,
                 "system": SYSTEM_PROMPT,
                 "stream": False,
+                "keep_alive": -1,
             },
         )
         resp.raise_for_status()
         return resp.json()["response"].strip().strip('"')
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
 
     class TranslateRequest(BaseModel):
         word: str
@@ -167,7 +172,7 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
     @app.post("/translate")
     async def translate(req: TranslateRequest):
         """Translate a word into a pose description via Ollama, with validation."""
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=120) as client:
             # Try up to 3 times to get a valid description
             description = None
             for attempt in range(3):
@@ -206,7 +211,20 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
             )
             resp.raise_for_status()
 
-        return Response(content=resp.content, media_type="image/png")
+        # Post-process: threshold near-white pixels to pure white
+        from PIL import Image
+        import io
+        import numpy as np
+
+        img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+        arr = np.array(img)
+        mask = np.all(arr > 230, axis=2)
+        arr[mask] = 255
+        img = Image.fromarray(arr)
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return Response(content=buf.getvalue(), media_type="image/png")
 
     # Serve the frontend
     app.mount("/", StaticFiles(directory="web", html=True), name="static")
