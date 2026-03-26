@@ -21,34 +21,33 @@ MODAL_ENDPOINT = "https://youfoundaaron--prtkl-generate-model-generate.modal.run
 SYSTEM_PROMPT = """\
 You translate a word into a one-sentence pose description for abstract particle art.
 
-Imagine a featureless mannequin — no face, no clothing, no gender, no objects. Describe ONLY how its body segments are positioned: head, torso, arms, hands, legs, feet.
+The figure is genderless, featureless, with no clothing or objects. But it IS expressive — use hand gestures, arm positions, and full-body poses to convey the word's meaning. Think of how a mime or dancer would express the word using only their body.
 
 Rules:
 1. Exactly ONE figure, always called "a figure"
-2. Use only concrete body-position language — no emotions, mood, style, or intent words in the output
-3. No clothing, accessories, facial features, objects, or furniture
-4. Do not imply contact with objects, furniture, or another person
-5. Avoid words an image model could misread as clothing: heels, collar, fist, sole, crown, palm, nails, laces, cuffs
-6. Describe a FROZEN moment, not ongoing motion — "mid-sway leaning left" not "swaying"
-7. Output ONLY the pose description, one sentence, no commentary
+2. No clothing, accessories, facial features, objects, or furniture
+3. Do not imply contact with objects, furniture, or another person
+4. Avoid words an image model could misread as clothing: heels, collar, sole, crown, nails, laces, cuffs
+5. Describe a FROZEN moment, not ongoing motion
+6. Output ONLY the pose description, one sentence, no commentary
+
+Be specific about hand and finger positions — they carry the most expression. Use the full body: levels (standing, kneeling, lying), asymmetry, twists, reaches.
 
 If the input refers to sex, nudity, or explicit anatomy, output: a figure standing with arms crossed over chest.
 If the input implies multiple people, express the feeling through one body's posture.
-Match the pose intensity to the word. Neutral or casual words (okay, hello, maybe, sure) get relaxed, natural poses. Only emotional words get dramatic poses.
 
 Examples:
-- "hello" → "a figure with one arm raised overhead, weight shifted to the back foot"
-- "okay" → "a figure standing upright, one arm bent with hand on hip, head level"
-- "grief" → "a figure hunched forward, head bowed, arms wrapped around torso"
-- "freedom" → "a figure with arms spread wide, head tilted back, torso arched slightly"
-- "kiss" → "a figure leaning forward, chin slightly lifted, arms reaching forward"
-- "exhaustion" → "a figure on one side, one arm extended along the ground, legs bent"
-- "hope" → "a figure on tiptoes, one arm stretched straight up, torso stretched upward"
-- "shame" → "a figure turned sideways, shoulders curled inward, head tucked into chest"
+- "hello" → "a figure waving with one hand raised high, fingers spread open"
+- "peace" → "a figure with one arm raised, two fingers extended in a V, other hand relaxed at side"
+- "okay" → "a figure standing relaxed, one hand making a thumbs-up, head tilted slightly"
+- "grief" → "a figure hunched forward, head bowed, arms wrapped tightly around torso"
+- "freedom" → "a figure with arms flung wide open, head tilted back, chest lifted"
+- "exhaustion" → "a figure bent over with hands on knees, head hanging low"
+- "hope" → "a figure on tiptoes reaching one arm straight up, fingers stretched toward the sky"
 - "power" → "a figure in a wide lunge, one arm thrust forward, torso twisted"
 - "loneliness" → "a figure sitting with knees drawn to chest, arms wrapped around legs"
-- "surrender" → "a figure kneeling, arms raised high above head, hands open"
-- "defeat" → "a figure collapsed forward onto hands and knees, head hanging between arms"
+- "surrender" → "a figure kneeling, both arms raised high above head, hands open"
+- "victory" → "a figure with both arms raised in a V overhead, legs planted wide apart"
 """
 
 NEGATIVE_PROMPT = (
