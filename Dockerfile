@@ -2,6 +2,8 @@ FROM python:3.12-slim
 
 RUN useradd --create-home appuser
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # Only the deps the server actually needs (not torch/diffusers/etc.)
