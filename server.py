@@ -8,6 +8,7 @@ Run:
 """
 
 import argparse
+import os
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,7 +38,7 @@ Match the pose intensity to the word. Neutral or casual words (okay, hello, mayb
 
 Examples:
 - "hello" → "a figure with one arm raised overhead, weight shifted to the back foot"
-- "okay" → "a figure standing with one hand resting on the opposite arm, head tilted slightly"
+- "okay" → "a figure standing upright, one arm bent with hand on hip, head level"
 - "grief" → "a figure hunched forward, head bowed, arms wrapped around torso"
 - "freedom" → "a figure with arms spread wide, head tilted back, torso arched slightly"
 - "kiss" → "a figure leaning forward, chin slightly lifted, arms reaching forward"
@@ -214,18 +215,35 @@ def create_app(ollama_url: str, ollama_model: str) -> FastAPI:
     return app
 
 
+app_for_reload = create_app(
+    os.environ.get("PRTKL_OLLAMA_URL", "http://localhost:11434"),
+    os.environ.get("PRTKL_OLLAMA_MODEL", "llama3.1:8b"),
+)
+
+
 def main():
     parser = argparse.ArgumentParser(description="prtkl backend server")
     parser.add_argument("--ollama-url", default="http://localhost:11434")
     parser.add_argument("--ollama-model", default="llama3.1:8b")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--no-reload", action="store_true", help="Disable auto-reload")
     args = parser.parse_args()
 
-    app = create_app(args.ollama_url, args.ollama_model)
-
     import uvicorn
-    uvicorn.run(app, host=args.host, port=args.port)
+    os.environ["PRTKL_OLLAMA_URL"] = args.ollama_url
+    os.environ["PRTKL_OLLAMA_MODEL"] = args.ollama_model
+    if args.no_reload:
+        app = create_app(args.ollama_url, args.ollama_model)
+        uvicorn.run(app, host=args.host, port=args.port)
+    else:
+        uvicorn.run(
+            "server:app_for_reload",
+            host=args.host,
+            port=args.port,
+            reload=True,
+            reload_dirs=[".", "web"],
+        )
 
 
 if __name__ == "__main__":
